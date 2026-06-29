@@ -1,4 +1,4 @@
-const API = "http://localhost:8000";
+const API = CONFIG.API_URL;
 
 let wallet = null;
 
@@ -20,20 +20,22 @@ function login() {
     document.getElementById("loginBox").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
 
-    // тут потом дернем backend для получения address
     fetchAddress();
 }
 
 // --------------------
-// GET ADDRESS (упрощённо через backend позже)
+// GET ADDRESS
+// --------------------
+
 async function fetchAddress() {
     const res = await fetch(`${API}/wallets`);
     const data = await res.json();
 
     const pk = wallet.privateKey;
 
-    // временно: просто ищем по wallets.json (dev режим)
-    const match = Object.values(data.wallets).find(w => w.private_key === pk);
+    const match = Object.values(data.wallets).find(
+        w => w.private_key === pk
+    );
 
     if (match) {
         wallet.address = match.address;
@@ -62,7 +64,7 @@ async function sendTx() {
 
     const res = await fetch(`${API}/transaction`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             sender: wallet.address,
             receiver: to,
