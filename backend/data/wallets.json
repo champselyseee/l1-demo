@@ -1,0 +1,16 @@
+{
+  "wallets": [
+    {
+      "name": "A",
+      "address": "L1A1c8b7f3d9e4a2",
+      "public_key": "PUB_A_PLACEHOLDER",
+      "private_key": "PRIV_A_PLACEHOLDER"
+    },
+    {
+      "name": "B",
+      "address": "L1B5d2f9a8c1e7b4",
+      "public_key": "PUB_B_PLACEHOLDER",
+      "private_key": "PRIV_B_PLACEHOLDER"
+    }
+  ]
+}
