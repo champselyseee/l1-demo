@@ -1,12 +1,38 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from blockchain import Blockchain
+from db import init_db
 
 app = FastAPI(title="L1 Demo Blockchain")
 
+# ------------------------
+# CORS (ВАЖНО для Vercel)
+# ------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # потом можно ограничить доменом Vercel
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ------------------------
 # создаём один экземпляр цепочки (наш "нода")
+# ------------------------
+
 chain = Blockchain()
+
+
+# ------------------------
+# STARTUP (ВОТ СЮДА ВСТАВКА БЫЛА НУЖНА)
+# ------------------------
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 # ------------------------
