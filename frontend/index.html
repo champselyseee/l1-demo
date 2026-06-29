@@ -1,1 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>L1 Wallet</title>
+    <link rel="stylesheet" href="style.css">
+</head>
 
+<body>
+
+<div class="container">
+
+    <!-- LOGIN -->
+    <div id="loginBox">
+        <h2>Enter Wallet</h2>
+        <input id="privateKey" placeholder="Private Key" />
+        <button onclick="login()">Login</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" style="display:none;">
+
+        <h2>Wallet</h2>
+
+        <p><b>Address:</b> <span id="address"></span></p>
+
+        <button onclick="getBalance()">Get Balance</button>
+        <p id="balance"></p>
+
+        <hr />
+
+        <h3>Send Transaction</h3>
+
+        <input id="to" placeholder="To address" />
+        <input id="amount" placeholder="Amount" />
+
+        <button onclick="sendTx()">Send</button>
+
+        <p id="txResult"></p>
+
+        <hr />
+
+        <button onclick="logout()">Logout</button>
+    </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
