@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual env
+venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# DB / data (если локально тестишь без docker volume)
+backend/data/*.db
+backend/data/*.sqlite
+
+# Docker
+*.pid
+
+# Misc
+*.swp
