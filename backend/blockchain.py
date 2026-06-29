@@ -1,7 +1,8 @@
-import hashlib
-import json
 import time
+import json
 from pathlib import Path
+
+from crypto import sha256
 
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -25,35 +26,36 @@ class Blockchain:
         with open(WALLETS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        return {
-            wallet["name"]: wallet
-            for wallet in data["wallets"]
+        return {w["name"]: w for w in data["wallets"]}
+
+    # ------------------------
+    # Transactions
+    # ------------------------
+
+    def create_transaction_hash(self, tx: dict) -> str:
+        tx_string = json.dumps(tx, sort_keys=True)
+        return sha256(tx_string)
+
+    def add_transaction(self, sender, receiver, amount):
+        tx = {
+            "from": sender,
+            "to": receiver,
+            "amount": amount,
+            "timestamp": time.time(),
         }
 
+        tx["tx_hash"] = self.create_transaction_hash(tx)
+
+        self.mempool.append(tx)
+        return tx
+
     # ------------------------
-    # Hash
+    # Blocks
     # ------------------------
 
-    def calculate_hash(
-        self,
-        index,
-        timestamp,
-        transactions,
-        previous_hash,
-        nonce,
-    ):
-        block_string = json.dumps(
-            {
-                "index": index,
-                "timestamp": timestamp,
-                "transactions": transactions,
-                "previous_hash": previous_hash,
-                "nonce": nonce,
-            },
-            sort_keys=True,
-        )
-
-        return hashlib.sha256(block_string.encode()).hexdigest()
+    def create_block_hash(self, block: dict) -> str:
+        block_string = json.dumps(block, sort_keys=True)
+        return sha256(block_string)
 
     # ------------------------
     # Genesis
@@ -67,41 +69,19 @@ class Blockchain:
             "timestamp": time.time(),
         }
 
-        timestamp = time.time()
+        genesis_tx["tx_hash"] = self.create_transaction_hash(genesis_tx)
 
         block = {
             "index": 0,
-            "timestamp": timestamp,
+            "timestamp": time.time(),
             "transactions": [genesis_tx],
             "previous_hash": "0" * 64,
             "nonce": 0,
         }
 
-        block["hash"] = self.calculate_hash(
-            block["index"],
-            block["timestamp"],
-            block["transactions"],
-            block["previous_hash"],
-            block["nonce"],
-        )
+        block["block_hash"] = self.create_block_hash(block)
 
         self.chain.append(block)
-
-    # ------------------------
-    # Transactions
-    # ------------------------
-
-    def add_transaction(self, sender, receiver, amount):
-        tx = {
-            "from": sender,
-            "to": receiver,
-            "amount": amount,
-            "timestamp": time.time(),
-        }
-
-        self.mempool.append(tx)
-
-        return tx
 
     # ------------------------
     # Mining
@@ -111,28 +91,19 @@ class Blockchain:
         if not self.mempool:
             return None
 
-        previous_block = self.chain[-1]
-
-        timestamp = time.time()
+        prev_block = self.chain[-1]
 
         block = {
             "index": len(self.chain),
-            "timestamp": timestamp,
+            "timestamp": time.time(),
             "transactions": self.mempool.copy(),
-            "previous_hash": previous_block["hash"],
+            "previous_hash": prev_block["block_hash"],
             "nonce": 0,
         }
 
-        block["hash"] = self.calculate_hash(
-            block["index"],
-            block["timestamp"],
-            block["transactions"],
-            block["previous_hash"],
-            block["nonce"],
-        )
+        block["block_hash"] = self.create_block_hash(block)
 
         self.chain.append(block)
-
         self.mempool.clear()
 
         return block
@@ -162,8 +133,8 @@ class Blockchain:
     def get_chain(self):
         return self.chain
 
-    def get_last_block(self):
-        return self.chain[-1]
-
     def get_mempool(self):
         return self.mempool
+
+    def get_last_block(self):
+        return self.chain[-1]
