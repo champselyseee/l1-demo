@@ -3,10 +3,14 @@ import json
 import psycopg
 
 
-DB_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@db:5432/l1"
-)
+# ------------------------
+# DB URL (ONLY ENV)
+# ------------------------
+
+DB_URL = os.getenv("DATABASE_URL")
+
+if not DB_URL:
+    raise RuntimeError("DATABASE_URL is not set")
 
 
 # ------------------------
@@ -14,6 +18,10 @@ DB_URL = os.getenv(
 # ------------------------
 
 def get_connection():
+    """
+    Creates fresh connection to Postgres
+    (simple version for L1-demo, no pool yet)
+    """
     return psycopg.connect(DB_URL)
 
 
@@ -22,6 +30,10 @@ def get_connection():
 # ------------------------
 
 def init_db():
+    """
+    Creates tables if they don't exist
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
 
@@ -30,10 +42,10 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS blocks (
                     index INTEGER PRIMARY KEY,
                     timestamp DOUBLE PRECISION,
-                    previous_hash TEXT,
-                    block_hash TEXT,
-                    nonce INTEGER,
-                    transactions JSONB
+                    previous_hash TEXT NOT NULL,
+                    block_hash TEXT NOT NULL,
+                    nonce INTEGER DEFAULT 0,
+                    transactions JSONB NOT NULL
                 );
             """)
 
@@ -41,10 +53,14 @@ def init_db():
 
 
 # ------------------------
-# INSERT BLOCK (PURE STORAGE)
+# INSERT BLOCK
 # ------------------------
 
 def insert_block(block: dict):
+    """
+    Stores a full block in Postgres
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
 
@@ -64,7 +80,7 @@ def insert_block(block: dict):
                 block["timestamp"],
                 block["previous_hash"],
                 block["block_hash"],
-                block["nonce"],
+                block.get("nonce", 0),
                 json.dumps(block["transactions"])
             ))
 
@@ -72,10 +88,14 @@ def insert_block(block: dict):
 
 
 # ------------------------
-# LOAD FULL CHAIN
+# LOAD CHAIN
 # ------------------------
 
 def load_chain():
+    """
+    Loads full blockchain from Postgres
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
 
