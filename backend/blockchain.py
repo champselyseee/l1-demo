@@ -1,8 +1,9 @@
 import time
 import json
+import uuid
 from pathlib import Path
 
-from crypto import sha256
+from crypto import sha256, generate_keypair, public_key_to_address
 
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -14,12 +15,15 @@ class Blockchain:
         self.chain = []
         self.mempool = []
 
+        # session_token -> address
+        self.sessions = {}
+
         self.wallets = self.load_wallets()
 
         self.create_genesis_block()
 
     # ------------------------
-    # Wallets
+    # WALLET SYSTEM
     # ------------------------
 
     def load_wallets(self):
@@ -28,15 +32,40 @@ class Blockchain:
 
         return {w["name"]: w for w in data["wallets"]}
 
+    def login(self, private_key: str):
+        """
+        returns session_token + wallet info
+        """
+        for wallet in self.wallets.values():
+            if wallet["private_key"] == private_key:
+
+                token = str(uuid.uuid4())
+                self.sessions[token] = wallet["address"]
+
+                return {
+                    "token": token,
+                    "address": wallet["address"],
+                    "public_key": wallet["public_key"]
+                }
+
+        return None
+
+    def get_address_by_token(self, token: str):
+        return self.sessions.get(token)
+
     # ------------------------
-    # Transactions
+    # TRANSACTIONS
     # ------------------------
 
     def create_transaction_hash(self, tx: dict) -> str:
-        tx_string = json.dumps(tx, sort_keys=True)
-        return sha256(tx_string)
+        return sha256(json.dumps(tx, sort_keys=True))
 
-    def add_transaction(self, sender, receiver, amount):
+    def add_transaction(self, token: str, receiver: str, amount: float):
+        sender = self.get_address_by_token(token)
+
+        if not sender:
+            raise ValueError("Invalid session token")
+
         tx = {
             "from": sender,
             "to": receiver,
@@ -50,16 +79,11 @@ class Blockchain:
         return tx
 
     # ------------------------
-    # Blocks
+    # BLOCKS
     # ------------------------
 
     def create_block_hash(self, block: dict) -> str:
-        block_string = json.dumps(block, sort_keys=True)
-        return sha256(block_string)
-
-    # ------------------------
-    # Genesis
-    # ------------------------
+        return sha256(json.dumps(block, sort_keys=True))
 
     def create_genesis_block(self):
         genesis_tx = {
@@ -83,10 +107,6 @@ class Blockchain:
 
         self.chain.append(block)
 
-    # ------------------------
-    # Mining
-    # ------------------------
-
     def mine_block(self):
         if not self.mempool:
             return None
@@ -109,10 +129,10 @@ class Blockchain:
         return block
 
     # ------------------------
-    # Balance
+    # BALANCE
     # ------------------------
 
-    def get_balance(self, address):
+    def get_balance(self, address: str):
         balance = 0
 
         for block in self.chain:
@@ -127,7 +147,53 @@ class Blockchain:
         return balance
 
     # ------------------------
-    # Getters
+    # TRANSACTION VIEWER
+    # ------------------------
+
+    def get_transactions(self):
+        txs = []
+
+        for block in self.chain:
+            for tx in block["transactions"]:
+                txs.append({
+                    **tx,
+                    "block_index": block["index"]
+                })
+
+        return txs
+
+    def get_transaction(self, tx_hash: str):
+        for block in self.chain:
+            for tx in block["transactions"]:
+                if tx["tx_hash"] == tx_hash:
+                    return {
+                        "found": True,
+                        "transaction": tx,
+                        "block_index": block["index"]
+                    }
+
+        return {"found": False}
+
+    # ------------------------
+    # EXPLORER
+    # ------------------------
+
+    def get_explorer(self):
+        return {
+            "height": len(self.chain),
+            "mempool_size": len(self.mempool),
+            "blocks": [
+                {
+                    "index": b["index"],
+                    "tx_count": len(b["transactions"]),
+                    "hash": b["block_hash"]
+                }
+                for b in self.chain
+            ]
+        }
+
+    # ------------------------
+    # GETTERS
     # ------------------------
 
     def get_chain(self):
