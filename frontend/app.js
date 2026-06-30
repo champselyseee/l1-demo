@@ -1,7 +1,7 @@
 const API =
     window.location.hostname === "localhost"
         ? "http://localhost:8000"
-        : "https://YOUR-BACKEND.up.railway.app";
+        : "https://l1-demo.railway.internal";
 
 let wallet = {
     privateKey: null,
