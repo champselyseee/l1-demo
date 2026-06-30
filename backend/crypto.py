@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives import serialization
 
 
 # ------------------------
-# HASH (для tx, block и т.д.)
+# HASH (core utils)
 # ------------------------
 
 def sha256(data: str) -> str:
@@ -16,12 +16,12 @@ def sha256(data: str) -> str:
 
 
 # ------------------------
-# KEY GENERATION
+# KEYPAIR GENERATION
 # ------------------------
 
 def generate_keypair():
     """
-    Создаёт пару ключей (как в реальных блокчейнах)
+    Generates Ed25519 keypair (demo wallet system)
     """
     private_key = Ed25519PrivateKey.generate()
     public_key = private_key.public_key()
@@ -44,28 +44,28 @@ def generate_keypair():
 
 
 # ------------------------
-# YOUR CUSTOM WALLET FORMAT
+# ADDRESS SYSTEM (L1 STYLE)
 # ------------------------
 
 def public_key_to_address(public_key_b64: str) -> str:
     """
-    ТВОЙ формат кошелька (L1-style address)
+    Custom L1 address format (like simplified Bitcoin/Ethereum idea)
     """
     pub_bytes = base64.b64decode(public_key_b64)
 
     h = hashlib.sha256(pub_bytes).hexdigest()
 
-    # кастомный адрес L1
+    # custom prefix for your chain
     return "L1" + h[:30]
 
 
 # ------------------------
-# SIGNING
+# SIGN MESSAGE
 # ------------------------
 
 def sign(private_key_b64: str, message: str) -> str:
     """
-    Подпись транзакции
+    Sign transaction message (future upgrade path)
     """
     priv_bytes = base64.b64decode(private_key_b64)
 
@@ -81,7 +81,7 @@ def sign(private_key_b64: str, message: str) -> str:
 
 def verify(public_key_b64: str, message: str, signature_b64: str) -> bool:
     """
-    Проверка подписи
+    Verify Ed25519 signature
     """
     pub_bytes = base64.b64decode(public_key_b64)
     signature = base64.b64decode(signature_b64)
@@ -96,12 +96,11 @@ def verify(public_key_b64: str, message: str, signature_b64: str) -> bool:
 
 
 # ------------------------
-# MESSAGE FORMAT (ВАЖНО ДЛЯ БЛОКЧЕЙНА)
+# TRANSACTION MESSAGE FORMAT
 # ------------------------
 
 def make_tx_message(sender: str, receiver: str, amount: float, timestamp: float) -> str:
     """
-    Единый формат того, что подписывается
-    (очень важно для консистентности сети)
+    Deterministic message used for signing/verifying transactions
     """
     return f"{sender}|{receiver}|{amount}|{timestamp}"
