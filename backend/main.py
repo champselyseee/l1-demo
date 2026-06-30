@@ -1,34 +1,30 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from blockchain import Blockchain
 from db import init_db
 
-app = FastAPI(title="L1 Demo Blockchain")
+app = FastAPI(title="L1 Demo Blockchain Node")
 
 # ------------------------
-# CORS (ВАЖНО для Vercel)
+# CORS (frontend: Vercel)
 # ------------------------
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # потом можно ограничить доменом Vercel
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ------------------------
-# создаём один экземпляр цепочки (наш "нода")
+# INIT BLOCKCHAIN
 # ------------------------
 
 chain = Blockchain()
 
-
-# ------------------------
-# STARTUP (ВОТ СЮДА ВСТАВКА БЫЛА НУЖНА)
-# ------------------------
 
 @app.on_event("startup")
 def startup():
@@ -36,11 +32,14 @@ def startup():
 
 
 # ------------------------
-# MODELS (API)
+# MODELS
 # ------------------------
 
+class LoginRequest(BaseModel):
+    private_key: str
+
+
 class TransactionRequest(BaseModel):
-    sender: str
     receiver: str
     amount: float
 
@@ -51,30 +50,25 @@ class TransactionRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {"status": "L1 node is running"}
-
-
-# ------------------------
-# CHAIN
-# ------------------------
-
-@app.get("/chain")
-def get_chain():
     return {
-        "length": len(chain.get_chain()),
-        "chain": chain.get_chain()
+        "status": "L1 node running"
     }
 
 
 # ------------------------
-# MEMPOOL
+# LOGIN
 # ------------------------
 
-@app.get("/mempool")
-def get_mempool():
+@app.post("/login")
+def login(req: LoginRequest):
+    result = chain.login(req.private_key)
+
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid private key")
+
     return {
-        "size": len(chain.get_mempool()),
-        "mempool": chain.get_mempool()
+        "success": True,
+        "data": result
     }
 
 
@@ -83,33 +77,48 @@ def get_mempool():
 # ------------------------
 
 @app.get("/balance/{address}")
-def get_balance(address: str):
-    balance = chain.get_balance(address)
+def balance(address: str):
+    bal = chain.get_balance(address)
 
     return {
-        "address": address,
-        "balance": balance
+        "success": True,
+        "data": {
+            "address": address,
+            "balance": bal
+        }
     }
 
 
 # ------------------------
-# CREATE TRANSACTION
+# TRANSACTION (AUTH VIA TOKEN)
 # ------------------------
 
 @app.post("/transaction")
-def create_transaction(tx: TransactionRequest):
-    if tx.amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be > 0")
+def transaction(
+    req: TransactionRequest,
+    authorization: str = Header(None)
+):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No token provided")
 
-    result = chain.add_transaction(
-        sender=tx.sender,
-        receiver=tx.receiver,
-        amount=tx.amount
-    )
+    # expected format: "Bearer <token>"
+    try:
+        token = authorization.split(" ")[1]
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token format")
+
+    try:
+        tx = chain.add_transaction(
+            token=token,
+            receiver=req.receiver,
+            amount=req.amount
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
 
     return {
-        "status": "added to mempool",
-        "transaction": result
+        "success": True,
+        "data": tx
     }
 
 
@@ -118,22 +127,75 @@ def create_transaction(tx: TransactionRequest):
 # ------------------------
 
 @app.post("/mine")
-def mine_block():
+def mine():
     block = chain.mine_block()
 
     if not block:
         raise HTTPException(status_code=400, detail="No transactions to mine")
 
     return {
-        "status": "block mined",
-        "block": block
+        "success": True,
+        "data": block
     }
 
 
 # ------------------------
-# WALLETS (debug endpoint)
+# TRANSACTIONS VIEWER
 # ------------------------
 
-@app.get("/wallets")
-def get_wallets():
-    return chain.wallets
+@app.get("/transactions")
+def transactions():
+    return {
+        "success": True,
+        "data": chain.get_transactions()
+    }
+
+
+# ------------------------
+# SINGLE TRANSACTION
+# ------------------------
+
+@app.get("/transaction/{tx_hash}")
+def get_transaction(tx_hash: str):
+    result = chain.get_transaction(tx_hash)
+
+    return {
+        "success": True,
+        "data": result
+    }
+
+
+# ------------------------
+# CHAIN (EXPLORER CORE)
+# ------------------------
+
+@app.get("/chain")
+def chain_view():
+    return {
+        "success": True,
+        "data": chain.get_chain()
+    }
+
+
+# ------------------------
+# MEMPOOL
+# ------------------------
+
+@app.get("/mempool")
+def mempool():
+    return {
+        "success": True,
+        "data": chain.get_mempool()
+    }
+
+
+# ------------------------
+# EXPLORER
+# ------------------------
+
+@app.get("/explorer")
+def explorer():
+    return {
+        "success": True,
+        "data": chain.get_explorer()
+    }
