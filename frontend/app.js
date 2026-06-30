@@ -3,22 +3,25 @@ const API =
         ? "http://localhost:8000"
         : "https://YOUR-BACKEND.up.railway.app";
 
-let wallet = null;
+let wallet = {
+    privateKey: null,
+    address: null,
+    token: null
+};
 
 // --------------------
-// API
+// API HELPER
 // --------------------
 
 async function api(endpoint, options = {}) {
-    const response = await fetch(`${API}${endpoint}`, options);
+    const res = await fetch(`${API}${endpoint}`, options);
+    const data = await res.json();
 
-    const json = await response.json();
-
-    if (!response.ok) {
-        throw new Error(json.detail || "Request failed");
+    if (!res.ok || data.success === false) {
+        throw new Error(data.detail || "Request failed");
     }
 
-    return json;
+    return data.data;
 }
 
 // --------------------
@@ -26,83 +29,82 @@ async function api(endpoint, options = {}) {
 // --------------------
 
 async function login() {
-    const privateKey = document
-        .getElementById("privateKey")
-        .value
-        .trim();
+    const privateKey = document.getElementById("privateKey").value.trim();
 
     if (!privateKey) {
         alert("No private key");
         return;
     }
 
-    wallet = {
-        privateKey: privateKey
-    };
-
-    localStorage.setItem("privateKey", privateKey);
-
     try {
-        await fetchAddress();
+        const data = await api("/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                private_key: privateKey
+            })
+        });
+
+        wallet.privateKey = privateKey;
+        wallet.address = data.address;
+        wallet.token = data.token;
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("address", data.address);
 
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("dashboard").style.display = "block";
-    }
-    catch (err) {
+
+        document.getElementById("address").innerText = data.address;
+
+    } catch (err) {
         alert(err.message);
     }
 }
 
 // --------------------
-// ADDRESS
+// AUTO LOGIN
 // --------------------
 
-async function fetchAddress() {
+window.onload = async () => {
+    const token = localStorage.getItem("token");
+    const address = localStorage.getItem("address");
 
-    const wallets = await api("/wallets");
+    if (!token || !address) return;
 
-    const match = Object.values(wallets).find(
-        walletData => walletData.private_key === wallet.privateKey
-    );
+    wallet.token = token;
+    wallet.address = address;
 
-    if (!match) {
-        throw new Error("Wallet not found");
-    }
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
 
-    wallet.address = match.address;
-
-    document.getElementById("address").innerText =
-        wallet.address;
-}
+    document.getElementById("address").innerText = address;
+};
 
 // --------------------
 // BALANCE
 // --------------------
 
 async function getBalance() {
+    try {
+        const data = await api(`/balance/${wallet.address}`);
 
-    if (!wallet) return;
+        document.getElementById("balance").innerText = data.balance;
 
-    const data = await api(`/balance/${wallet.address}`);
-
-    document.getElementById("balance").innerText =
-        data.balance;
+    } catch (err) {
+        alert(err.message);
+    }
 }
 
 // --------------------
-// SEND TX
+// SEND TRANSACTION
 // --------------------
 
 async function sendTx() {
-
-    const receiver = document
-        .getElementById("to")
-        .value
-        .trim();
-
-    const amount = parseFloat(
-        document.getElementById("amount").value
-    );
+    const receiver = document.getElementById("to").value.trim();
+    const amount = parseFloat(document.getElementById("amount").value);
 
     if (!receiver) {
         alert("Receiver required");
@@ -115,28 +117,60 @@ async function sendTx() {
     }
 
     try {
-
-        const result = await api("/transaction", {
+        const data = await api("/transaction", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${wallet.token}`
             },
             body: JSON.stringify({
-                sender: wallet.address,
-                receiver: receiver,
-                amount: amount
+                receiver,
+                amount
             })
         });
 
         document.getElementById("txResult").innerText =
-            JSON.stringify(result, null, 2);
+            JSON.stringify(data, null, 2);
 
     } catch (err) {
-
         alert(err.message);
-
     }
+}
 
+// --------------------
+// MINE BLOCK
+// --------------------
+
+async function mine() {
+    try {
+        const data = await api("/mine", {
+            method: "POST"
+        });
+
+        alert("Block mined!");
+        console.log(data);
+
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+// --------------------
+// TRANSACTIONS VIEWER
+// --------------------
+
+async function loadTransactions() {
+    try {
+        const data = await api("/transactions");
+
+        console.log("TXS:", data);
+
+        document.getElementById("txResult").innerText =
+            JSON.stringify(data, null, 2);
+
+    } catch (err) {
+        alert(err.message);
+    }
 }
 
 // --------------------
@@ -144,44 +178,8 @@ async function sendTx() {
 // --------------------
 
 function logout() {
-
-    localStorage.removeItem("privateKey");
-
-    wallet = null;
+    localStorage.removeItem("token");
+    localStorage.removeItem("address");
 
     location.reload();
-
 }
-
-// --------------------
-// AUTO LOGIN
-// --------------------
-
-window.onload = async () => {
-
-    const savedKey = localStorage.getItem("privateKey");
-
-    if (!savedKey) {
-        return;
-    }
-
-    wallet = {
-        privateKey: savedKey
-    };
-
-    try {
-
-        await fetchAddress();
-
-        document.getElementById("loginBox").style.display = "none";
-        document.getElementById("dashboard").style.display = "block";
-
-    } catch (err) {
-
-        console.error(err);
-
-        localStorage.removeItem("privateKey");
-
-    }
-
-};
